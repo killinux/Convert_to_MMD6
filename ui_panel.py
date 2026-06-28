@@ -3,6 +3,9 @@ import bpy
 import os
 import json
 
+# 安装/更新时间戳（每次重新安装到 Blender 时更新，用于确认插件已刷新）
+BUILD_TIME = "2026-06-28 12:52:16"
+
 class OBJECT_OT_load_preset(bpy.types.Operator):
     bl_idname = "object.load_preset"
     bl_label = "Load Preset"
@@ -40,6 +43,10 @@ class OBJECT_PT_skeleton_hierarchy(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         scene = context.scene
+
+        # 顶部更新时间戳：看到此处时间变化即代表插件已成功更新
+        stamp = layout.box()
+        stamp.label(text=f"✅ 已更新: {BUILD_TIME}", icon='CHECKMARK')
 
 
         # 检查活动对象是否为骨架
@@ -261,7 +268,11 @@ class OBJECT_PT_skeleton_hierarchy(bpy.types.Panel):
             row.operator("object.convert_to_apose", text="转换为A-Pose")
             # 添加第 0 步归正骨骼按钮
             row.operator("object.correct_bones", text="归正骨架位置")
-            
+
+            # 拉直手臂（检测并修正肘/腕弯曲，网格跟随）
+            row = layout.row()
+            row.operator("object.straighten_arms", text="拉直手臂(肘+腕)", icon='CON_STRETCHTO')
+
             # 添加重命名按钮和补全缺失骨骼按钮到同一行
             row = layout.row()
             row.operator("object.rename_to_mmd", text="1.重命名为MMD")

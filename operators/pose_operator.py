@@ -152,9 +152,9 @@ class OBJECT_OT_convert_to_apose(bpy.types.Operator):
                 # 重置旋转，确保从默认状态开始
                 bone.rotation_euler = (0, 0, 0)
                 
-                # 选择骨骼
+                # 选择骨骼（姿态模式下选择走底层 Bone.select，PoseBone 无 select 属性）
                 bpy.ops.pose.select_all(action='DESELECT')
-                bone.select = True
+                bone.bone.select = True
                 obj.data.bones.active = bone.bone
                 
                 # 绕全局空间 Y 轴旋转
@@ -173,6 +173,39 @@ class OBJECT_OT_convert_to_apose(bpy.types.Operator):
 
         # 9. 更新视图以确保姿态已应用
         context.view_layer.update()
+
+        # 9.5 自动修正肘部弯曲：让小臂(下臂)方向与大臂(上臂)共线，手部作为子级自动跟随
+        #     通用于任意源骨骼——只要在UI里映射了上臂和下臂；无弯曲则跳过
+        def _straighten_elbow(upper_name, lower_name):
+            if not upper_name or not lower_name:
+                return None
+            pu = pose_bones.get(upper_name)
+            pl = pose_bones.get(lower_name)
+            if not pu or not pl:
+                return None
+            d_upper = pu.vector.normalized()
+            d_lower = pl.vector.normalized()
+            angle_before = math.degrees(d_lower.angle(d_upper))
+            if angle_before < 0.5:
+                return None  # 已基本伸直，无需修正
+            # 计算把小臂方向旋到大臂方向的旋转，绕肘关节(下臂头部)施加
+            rot = d_lower.rotation_difference(d_upper).to_matrix().to_4x4()
+            mat = pl.matrix.copy()
+            head_loc = mat.to_translation()
+            new_mat = rot @ mat
+            new_mat.translation = head_loc  # 保持肘关节位置不变，只改朝向
+            pl.matrix = new_mat
+            context.view_layer.update()
+            return angle_before
+
+        straightened = []
+        for _u, _l in (("left_upper_arm", "left_lower_arm"),
+                       ("right_upper_arm", "right_lower_arm")):
+            a = _straighten_elbow(arm_bones.get(_u, ""), arm_bones.get(_l, ""))
+            if a is not None:
+                straightened.append(f"{arm_bones[_l]}({a:.1f}°)")
+        if straightened:
+            self.report({'INFO'}, "已自动修正肘部弯曲: " + ", ".join(straightened))
 
         # 10. 应用第二个修改器（复制的修改器）来调整网格姿态
         try:

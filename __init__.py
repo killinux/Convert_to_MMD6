@@ -24,6 +24,7 @@ from .operators import correct_bones_operator
 from .operators import add_leg_d_bones_operator
 from .operators import add_twist_bone_operator
 from .operators import add_shoulder_p_bones_operator
+from .operators import straighten_arms_operator
 from .tools import export_bones_info_operator
 from .tools import export_constraints_operator
 from .tools import merge_bones_operator
@@ -71,6 +72,7 @@ def register():
     bpy.utils.register_class(auto_connect_parent_bones_operator.OBJECT_OT_auto_connect_parent_bones)
     bpy.utils.register_class(auto_connect_parent_bones_operator.OBJECT_OT_unlock_all_bones)
     bpy.utils.register_class(small_utils_operator.OBJECT_OT_convert_bones_rotation_to_quaternion)
+    bpy.utils.register_class(straighten_arms_operator.OBJECT_OT_straighten_arms)
     # 注册动态属性
     bones = preset_operator.get_bones_list()
     properties.register_properties(bones)
@@ -130,6 +132,7 @@ def unregister():
     bpy.utils.unregister_class(auto_connect_parent_bones_operator.OBJECT_OT_auto_connect_parent_bones)
     bpy.utils.unregister_class(auto_connect_parent_bones_operator.OBJECT_OT_unlock_all_bones)
     bpy.utils.unregister_class(small_utils_operator.OBJECT_OT_convert_bones_rotation_to_quaternion)
+    bpy.utils.unregister_class(straighten_arms_operator.OBJECT_OT_straighten_arms)
     # 注销动态属性
     bones = preset_operator.get_bones_list()
     properties.unregister_properties(bones)

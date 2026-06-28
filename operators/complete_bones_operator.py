@@ -37,6 +37,40 @@ class OBJECT_OT_complete_missing_bones(bpy.types.Operator):
                     # 将当前骨骼的尾部设置为下一个骨骼的头部
                     current_bone.tail = next_bone.head
 
+    def transfer_pelvis_to_lower_body(self, obj):
+        """把 XPS 骨盆(pelvis)骨骼的网格权重转移到新建的「下半身」。
+
+        新建的「下半身」骨骼本身没有任何顶点权重，若不处理，下半身旋转时髋部
+        网格不会跟随（即用户反馈的“下半身有问题”）。XPS 把髋部权重画在
+        'bip001 pelvis'（常被标记为 'unused bip001 pelvis'）上，而 MMD 把它归到
+        「下半身」。这里复用 XPS 已有的骨盆权重，移动到「下半身」顶点组，
+        不凭空合成权重。参考 Convert_to_MMD5 convert/weights/transfer.py。
+        """
+        meshes = [mo for mo in bpy.data.objects
+                  if mo.type == 'MESH'
+                  and any(md.type == 'ARMATURE' and md.object == obj for md in mo.modifiers)]
+        # 识别骨盆骨骼（名称含 pelvis，XPS 通常为 'unused bip001 pelvis'）
+        pelvis_names = [b.name for b in obj.data.bones if 'pelvis' in b.name.lower()]
+        if not meshes or not pelvis_names:
+            return 0
+        moved = 0
+        for mesh in meshes:
+            lb_vg = mesh.vertex_groups.get('下半身') or mesh.vertex_groups.new(name='下半身')
+            for pname in pelvis_names:
+                vg = mesh.vertex_groups.get(pname)
+                if not vg:
+                    continue
+                gi = vg.index
+                for v in mesh.data.vertices:
+                    for g in v.groups:
+                        if g.group == gi and g.weight > 0.001:
+                            lb_vg.add([v.index], g.weight, 'ADD')
+                            moved += 1
+                            break
+                # 源骨盆顶点组已并入下半身，移除以免残留无效绑定
+                mesh.vertex_groups.remove(vg)
+        return moved
+
     def execute(self, context):
         obj = context.active_object
         if not obj or obj.type != 'ARMATURE':
@@ -247,6 +281,13 @@ class OBJECT_OT_complete_missing_bones(bpy.types.Operator):
 
         # 连接手指骨骼的头尾
         self.connect_finger_bones(edit_bones)
+
+        # 切回对象模式，把骨盆(pelvis)权重转移到新建的「下半身」
+        # （新建的下半身无权重，需复用 XPS 骨盆权重，否则下半身旋转髋部不跟随）
+        bpy.ops.object.mode_set(mode='OBJECT')
+        moved = self.transfer_pelvis_to_lower_body(obj)
+        if moved:
+            self.report({'INFO'}, f"已将骨盆权重转移到下半身（{moved} 顶点）")
 
         return {'FINISHED'}
 
